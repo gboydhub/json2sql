@@ -23,6 +23,13 @@ if file_list.length == 0
   exit
 end
 
+<<-HEREDOC
+    json2sql Copyright (C) 2018 Gary Boyd
+    This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+    This is free software, and you are welcome to redistribute it
+    under certain conditions; type `show c' for details.
+HEREDOC
+
 file_list.each do |file|
   file[:file].readlines.each_with_index do |json_data, index|
     t_tables, t_columns, t_entries = create_entries_from_json(JSON.parse(json_data))
