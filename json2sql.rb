@@ -40,28 +40,46 @@ if file_list.length == 0
 end
 
 puts <<~HEREDOC
+
     json2sql Copyright (C) 2018 Gary Boyd
     This program comes with ABSOLUTELY NO WARRANTY.
     This is free software, and you are welcome to redistribute it
     under certain conditions.
+
 HEREDOC
 
 file_list.each do |file|
   file_tables = []
   file_columns = []
   file_entries = []
-  file[:file].readlines.each_with_index do |json_data, index|
+
+  cur_file = file[:file_name] + "." + file[:file_extension]
+  file_lines = file[:file].count
+  line_counter = 1
+  file[:file].rewind
+
+  file[:file].each do |json_data|
+    print "Parsing entry: #{line_counter}/#{file_lines} [#{cur_file}]\r"
     t_tables, t_columns, t_entries = create_entries_from_json(JSON.parse(json_data))
 
     file_tables << t_tables
     file_columns << t_columns
     file_entries << t_entries
+
+    line_counter += 1
+    $stdout.flush
+  end
+  file[:file].close
+
+  puts "File complete: #{cur_file}"
+
+  if line_counter > 1
     f_out = File.new(file[:file_name] + ".txt", 'w')
-    create_table_queries(t_tables, t_columns).each do |l|
+    create_table_queries(file_tables, file_columns).each do |l|
       f_out.write(l + ";\n")
     end
     f_out.write("\n")
-    create_insert_queries(t_entries, t_tables, 1).each do |l|
+    create_insert_queries(file_entries, file_tables, 1).each do |l|
       f_out.write(l + ";\n")
     end
   end
