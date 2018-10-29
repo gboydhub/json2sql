@@ -1,3 +1,5 @@
 sample.json
 sample.txt
 Gemfile.lock
+*.json
+*.txt
