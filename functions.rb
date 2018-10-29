@@ -38,16 +38,17 @@ def wildcard_fopen(file_string)
   return_files
 end
 
-def create_entries_from_json(val, current_table="", current_column="", nest_id=0, created_tables=[], created_columns=[], values=[])
+def create_entries_from_json(val, rel_id=1, current_table="", current_column="", nest_id=0, created_tables=[], created_columns=[], values=[])
   if val.class == Array
       val.each do |v|
-        created_tables, created_columns, values = create_entries_from_json(v, current_table, current_column, nest_id, created_tables, created_columns, values)
+        created_tables, created_columns, values = create_entries_from_json(v, rel_id, current_table, current_column, nest_id, created_tables, created_columns, values)
       end
   elsif val.class == Hash
       val.each_pair do |k, v|
         if k.class != String 
           k = k.to_s
         end
+        k = escape_str(k.gsub("'", ""))
 
         if !created_tables.include?(k) && nest_id == 0
             created_tables << k
@@ -60,7 +61,7 @@ def create_entries_from_json(val, current_table="", current_column="", nest_id=0
           current_column = k
         end
 
-        created_tables, created_columns, values = create_entries_from_json(v, current_table, current_column, nest_id + 1, created_tables, created_columns, values)
+        created_tables, created_columns, values = create_entries_from_json(v, rel_id, current_table, current_column, nest_id + 1, created_tables, created_columns, values)
       end
   else
       if current_column == ""
@@ -77,8 +78,8 @@ def create_entries_from_json(val, current_table="", current_column="", nest_id=0
       if val.class != String
         val = val.to_s
       end
-      val = val.gsub("'", "\\\\'")
-      values << {table_name: current_table.to_s, column_name: current_column, value: val, column_size: val.length}
+      val = escape_str(val)
+      values << {table_name: current_table.to_s, column_name: current_column, value: val, column_size: val.length, relation_id: rel_id}
       created_columns.each_index do |index|
         if created_columns[index].keys.first.to_s == current_column
           if created_columns[index][:size] < (val.length * 1.2).floor
@@ -90,20 +91,27 @@ def create_entries_from_json(val, current_table="", current_column="", nest_id=0
   end
 
   created_columns.each_index do |i|
-    biggest = values.select { |k| k[:column_name] == created_columns[i][:name] }.max_by { |e| e[:column_size]}
+    biggest = values.select { |k| k[:column_name] == created_columns[i][:name] && k[:table_name] == created_columns[i][:table]}.max_by { |e| e[:column_size]}
     created_columns[i][:size] = (biggest[:column_size] * 2).floor
   end
+  created_tables = created_tables.flatten.uniq
   return created_tables, created_columns, values
 end
 
 def create_table_queries(table_list, column_list)
   create_statements = []
+  # p table_list
+  # p column_list
+  column_list = column_list.flatten
+  table_list = table_list.flatten.uniq
   table_list.each do |table|
     col_count = 0
     table_cols = []
 
+    #puts "-----#{table}-----"
     create_query = "CREATE TABLE #{table} (id bigint,product_id bigint,"
 
+    #p column_list.flatten.select { |k| k[:table] == table}
     cols = column_list.select { |k| k[:table] == table}.uniq { |h| h[:name] }
     cols.each do |c|
       create_query += "#{c[:name]} varchar(#{c[:size]}),"
@@ -113,14 +121,19 @@ def create_table_queries(table_list, column_list)
     create_statements << create_query
   end
 
+  create_statements << "CREATE TABLE raw_data (id bigint, product_id bigint, data text)"
+
   create_statements
 end
 
-def create_insert_queries(entries, tables, product_id)
+def create_insert_queries(entries, tables)
   table_cols = []
   table_vals = []
-  current_product_id = 1
+  product_id = 1
   last_table = tables[0]
+  tables = tables.flatten.uniq
+  entries = entries.flatten
+
 
   insert_queries = []
   tables.each do |table|
@@ -136,7 +149,7 @@ def create_insert_queries(entries, tables, product_id)
         cur_row.each do |r|
           statement += "#{r[:column_name]},"
         end
-        statement = statement.chomp(",") + ") VALUES(#{product_id},"
+        statement = statement.chomp(",") + ") VALUES(#{e[:relation_id]},"
         cur_row.each do |r|
           statement += "'#{r[:value]}',"
         end

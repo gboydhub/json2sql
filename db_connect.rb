@@ -25,6 +25,7 @@
 # along with this program. (See /COPYING)  If not, see <https://www.gnu.org/licenses/>.
 
 require 'tiny_tds'
+require 'mysql2'
 
 def create_client_from_config()
     unless $config_vars[:db_out]
@@ -49,4 +50,8 @@ def create_client_from_config()
         results = client.execute("SET CONCAT_NULL_YIELDS_NULL ON")  
         return client
     end
+end
+
+def escape_str(str)
+    Mysql2::Client.escape(str)
 end
