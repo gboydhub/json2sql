@@ -41,7 +41,6 @@ $config_vars = {
   do_tables: true
 }
 
-p ARGV
 ARGV.each_with_index do |arg, i|
   case arg
   when '--help'
@@ -80,7 +79,7 @@ HELPDOC
     $config_vars[:db_user] = ARGV[i+1]
   when '--db-pass'
     $config_vars[:db_pass] = ARGV[i+1]
-  when '--db_port'
+  when '--db-port'
     $config_vars[:db_port] = ARGV[i+1]
   when '--p-cols'
     $config_vars[:pre_columns_string] = ARGV[i+1]
@@ -90,6 +89,30 @@ HELPDOC
   when '--table-only'
     $config_vars[:do_tables] = true
     $config_vars[:do_insert] = false
+  end
+end
+
+if $config_vars[:db_out] == true
+  hit_issue = false
+  if $config_vars[:db_host] == ""
+    hit_issue = true
+    puts "Must provide a host when using db connection"
+  end
+  if $config_vars[:db_port] == ""
+    hit_issue = true
+    puts "Must provide a port when using db connection"
+  end
+  if $config_vars[:db_user] == ""
+    hit_issue = true
+    puts "Must provide a user when using db connection"
+  end
+  if $config_vars[:db_pass] == ""
+    hit_issue = true
+    puts "Must provide a password when using db connection"
+  end
+  if hit_issue == true
+    puts "Please see json2sql --help for details"
+    exit
   end
 end
 
