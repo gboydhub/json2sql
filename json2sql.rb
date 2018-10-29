@@ -34,6 +34,7 @@ $config_vars = {
   db_pass: "",
   db_user: "",
   db_port: "",
+  db_name: "",
   db_type: "azure",
   pre_columns: [],
   pre_columns_string: "",
@@ -60,6 +61,7 @@ Output options:
     --db-user [username]
     --db-pass [password]
     --db-port [port]
+    --db-name [name]
   --p-cols                  Allows you to determine predefined columns in all tables. Seperate with comma, no spaces. Default: id[bigint]
   --insert-only             Only generates insert statements
   --table-only              Only generate create table statements
@@ -81,6 +83,8 @@ HELPDOC
     $config_vars[:db_pass] = ARGV[i+1]
   when '--db-port'
     $config_vars[:db_port] = ARGV[i+1]
+  when '--db-name'
+    $config_vars[:db_name] = ARGV[i+1]
   when '--p-cols'
     $config_vars[:pre_columns_string] = ARGV[i+1]
   when '--insert-only'
