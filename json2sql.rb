@@ -26,18 +26,99 @@
 
 require_relative("functions.rb")
 
+$config_vars = {
+  schema: "",
+  text_out: true,
+  db_out: false,
+  db_host: "",
+  db_pass: "",
+  db_user: "",
+  db_port: "",
+  db_type: "azure",
+  pre_columns: [],
+  pre_columns_string: "",
+  do_insert: true,
+  do_tables: true
+}
+
+p ARGV
+ARGV.each_with_index do |arg, i|
+  case arg
+  when '--help'
+puts <<-HELPDOC
+Use:
+  json2sql [filename] [options]
+      Accepts wildcards with *
+
+Options:
+  --help                    Displays this message
+  --schema [name]           Adds a schema prefix to SQL commands
+
+Output options:
+  --out-text                Outputs the SQL to a text file (input_filename.txt)
+  --out-db [type]           Will directly insert data into the database. Supported types: azure
+    --db-host [host]
+    --db-user [username]
+    --db-pass [password]
+    --db-port [port]
+  --p-cols                  Allows you to determine predefined columns in all tables. Seperate with comma, no spaces. Default: id[bigint]
+  --insert-only             Only generates insert statements
+  --table-only              Only generate create table statements
+
+HELPDOC
+    exit
+  when '--schema'
+    $config_vars[:schema] = ARGV[i+1]
+  when '--out-text'
+    $config_vars[:text_out] = true
+  when '--out-db'
+    $config_vars[:db_out] = true
+    $config_vars[:db_type] = ARGV[i+1]
+  when '--db-host'
+    $config_vars[:db_host] = ARGV[i+1]
+  when '--db-user'
+    $config_vars[:db_user] = ARGV[i+1]
+  when '--db-pass'
+    $config_vars[:db_pass] = ARGV[i+1]
+  when '--db_port'
+    $config_vars[:db_port] = ARGV[i+1]
+  when '--p-cols'
+    $config_vars[:pre_columns_string] = ARGV[i+1]
+  when '--insert-only'
+    $config_vars[:do_insert] = true
+    $config_vars[:do_tables] = false
+  when '--table-only'
+    $config_vars[:do_tables] = true
+    $config_vars[:do_insert] = false
+  end
+end
+
+if $config_vars[:pre_columns_string] != ""
+  r_hash = []
+  $config_vars[:pre_columns_string].split(",").each do |col|
+    col_name = col.split("[")[0]
+    col_type = col.split("[")[1].chomp("]")
+    r_hash << {name: col_name, type: col_type}
+  end
+  $config_vars[:pre_columns] = r_hash
+end
+p $config_vars
+
 file_name = ARGV[0] || ""
 if file_name.length == 0
   puts "Please enter a valid file name"
-  puts "Example: ruby j2s.rb data_*.json"
+  puts "See json2sql --help"
   exit
 end
 
 file_list = wildcard_fopen(file_name)
 if file_list.length == 0
   puts "Invalid file name: #{file_name}"
+  puts "See json2sql --help"
   exit
 end
+
+system('cls') || system('clear')
 
 puts <<~HEREDOC
 
@@ -47,6 +128,8 @@ puts <<~HEREDOC
     under certain conditions.
 
 HEREDOC
+
+puts "\n"
 
 file_list.each do |file|
   file_tables = []
