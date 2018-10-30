@@ -202,9 +202,6 @@ file_list.each do |file|
 
     line_counter += 1
     item_counter += 1
-    # if line_counter > 1600
-    #   break
-    # end
     $stdout.flush
   end
   file[:file].close
@@ -224,15 +221,3 @@ if $config_vars[:do_tables]
   end
   f_out.write("\n")
 end
-# if $config_vars[:do_insert]
-#   puts "Writing body to [#{out_name}]\r"
-#   create_insert_queries(file_entries, file_tables) do |l|
-#   #create_insert_queries(file_entries, file_tables).each do |l|
-#     f_out.write(l + ";\n")
-#     #puts l
-#   end
-#   f_out.write("\n")
-#   prod_raw.each do |l|
-#     f_out.write(l)
-#   end
-# end

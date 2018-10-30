@@ -81,7 +81,7 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
       if val.class != String
         val = val.to_s
       end
-      val = val.gsub("'", "''")#escape_str(val)
+      val = escape_str(val.gsub("'", "''"))#escape_str(val)
       values << {table_name: current_table.to_s, column_name: current_column, value: val, column_size: val.length, relation_id: rel_id}
       created_columns.select { |c| c[:name] == current_column && c[:table] == current_table.to_s}.each_index do |i|
         created_columns
