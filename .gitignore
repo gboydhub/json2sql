@@ -1,5 +1,5 @@
-sample.json
-sample.txt
 Gemfile.lock
 *.json
 *.txt
+*.sql
+.DS_Store

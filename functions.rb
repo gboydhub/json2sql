@@ -48,16 +48,19 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
         if k.class != String 
           k = k.to_s
         end
+        if k == ""
+          k = "cvalue"
+        end
         k = escape_str(k.gsub("'", ""))
+        k = "c#{k}"
 
         if !created_tables.include?(k) && nest_id == 0
             created_tables << k
             current_table = k
         else
-          if k == ""
-            k = "value"
+          if created_columns.select { |c| c[:name] == k && c[:table] == current_table}.length == 0
+            created_columns << {table: current_table, name: k, size: 0}
           end
-          created_columns << {table: current_table, name: k, size: 0}
           current_column = k
         end
 
@@ -65,7 +68,7 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
       end
   else
       if current_column == ""
-          current_column = "value"
+          current_column = "cvalue"
       end
       # p created_columns
       # p current_column
@@ -78,22 +81,37 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
       if val.class != String
         val = val.to_s
       end
-      val = escape_str(val)
+      val = val.gsub("'", "''")#escape_str(val)
       values << {table_name: current_table.to_s, column_name: current_column, value: val, column_size: val.length, relation_id: rel_id}
+      created_columns.select { |c| c[:name] == current_column && c[:table] == current_table.to_s}.each_index do |i|
+        created_columns
+      end
       created_columns.each_index do |index|
-        if created_columns[index].keys.first.to_s == current_column
+        if created_columns[index][:name] == current_column && created_columns[index][:table] == current_table.to_s
           if created_columns[index][:size] < (val.length * 1.2).floor
             created_columns[index][:size] = (val.length * 1.2).floor
+            if current_column == "shipping" && current_table.to_s == "prices"
+            #puts "Col: #{current_column}\nS: #{created_columns[index][:size]}"
+            end
           end
         end
       end
       #p values.last
   end
 
-  created_columns.each_index do |i|
-    biggest = values.select { |k| k[:column_name] == created_columns[i][:name] && k[:table_name] == created_columns[i][:table]}.max_by { |e| e[:column_size]}
-    created_columns[i][:size] = (biggest[:column_size] * 2).floor
-  end
+  # c_list = created_columns.select { |k| k[:table] == current_table}
+
+  # c_list.each_index do |i|
+  #   biggest = values.select { |h| h[:column_name] == c_list[i][:name] && h[:table_name] == c_list[i][:table]}.max_by { |m| m[:column_size]}
+  #   created_columns[i][:size] = biggest[:column_size]
+  # end
+  #created_columns = c_list
+
+  # created_columns.each_index do |i|
+  #   biggest = values.select { |k| k[:column_name] == created_columns[i][:name] && k[:table_name] == created_columns[i][:table]}.max_by { |e| e[:column_size]}
+  #   created_columns[i][:size] = (biggest[:column_size] * 2).floor
+  # end
+
   created_tables = created_tables.flatten.uniq
   return created_tables, created_columns, values
 end
@@ -109,21 +127,39 @@ def create_table_queries(table_list, column_list)
     table_cols = []
 
     #puts "-----#{table}-----"
-    create_query = "CREATE TABLE #{table} (id bigint,product_id bigint,"
+    create_query = "CREATE TABLE #{$config_vars[:schema]}#{table} (id bigint IDENTITY(1,1) PRIMARY KEY,product_id bigint,"
 
     #p column_list.flatten.select { |k| k[:table] == table}
-    cols = column_list.select { |k| k[:table] == table}.uniq { |h| h[:name] }
-    cols.each do |c|
-      create_query += "#{c[:name]} varchar(#{c[:size]}),"
+    #p column_list.select { |k| k[:table] == table}
+    # c_list = column_list.select { |k| k[:table] == table}.uniq { |h| h[:name] }
+    # p c_list
+    # c_list.each_index do |i|
+    #   p values.select { |h| h[:column_name] == c_list[i][:name] && h[:table_name] == c_list[i][:table]}.max_by { |m| m[:column_size]}
+    # end
+    cols = column_list.select { |c| c[:table] == table}.uniq { |u| u[:name] }
+    cols.each_index do |i|
+      big = column_list.select { |c| c[:table] == table && c[:name] == cols[i][:name]}.max_by { |b| b[:size] }
+      cols[i][:size] = big[:size]
     end
+    #cols = cols.uniq { |h| h[:name] }#.max_by { |c| c[:size] }#.first#uniq { |h| h[:name] }
+    cols.each do |c|
+      if c[:size] > 7500
+        create_query += "#{c[:name]} text,"
+      else
+        create_query += "#{c[:name]} varchar(#{c[:size]}),"
+      end
+    end
+    #p cols
+    #create_query += "#{cols[:name]} varchar(#{cols[:size]}),"
 
     create_query = create_query.chomp(",") + ")"
-    create_statements << create_query
+    #create_statements << create_query
+    yield create_query
   end
 
-  create_statements << "CREATE TABLE raw_data (id bigint, product_id bigint, data text)"
+  yield "CREATE TABLE #{$config_vars[:schema]}raw_data (id bigint IDENTITY(1,1) PRIMARY KEY, product_id bigint, data text)"
 
-  create_statements
+  #create_statements
 end
 
 def create_insert_queries(entries, tables)
@@ -145,7 +181,7 @@ def create_insert_queries(entries, tables)
       end
 
       if ind == cur_entries.length-1 || cur_row.select { |k| k[:column_name] == cur_entries[ind+1][:column_name]}.length > 0
-        statement = "INSERT INTO #{table} (product_id,"
+        statement = "INSERT INTO #{$config_vars[:schema]}#{table} (product_id,"
         cur_row.each do |r|
           statement += "#{r[:column_name]},"
         end
@@ -156,10 +192,10 @@ def create_insert_queries(entries, tables)
         statement = statement.chomp(",") + ")"
 
         cur_row = []
-        insert_queries << statement
+        yield statement
       end
     end
   end
 
-  insert_queries
+  #insert_queries
 end

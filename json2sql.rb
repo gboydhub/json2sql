@@ -70,7 +70,7 @@ Output options:
 HELPDOC
     exit
   when '--schema'
-    $config_vars[:schema] = ARGV[i+1]
+    $config_vars[:schema] = "#{ARGV[i+1]}."
   when '--out-text'
     $config_vars[:text_out] = true
   when '--out-db'
@@ -130,9 +130,9 @@ if $config_vars[:pre_columns_string] != ""
   end
   $config_vars[:pre_columns] = r_hash
 end
-p $config_vars
+#p $config_vars
 
-file_name = ARGV[0] || ""
+file_name = '*.txt'#ARGV[0] || ""
 if file_name.length == 0
   puts "Please enter a valid file name"
   puts "See json2sql --help"
@@ -157,42 +157,82 @@ puts <<~HEREDOC
 
 HEREDOC
 
-puts "\n"
+out_client = false
+if $config_vars[:db_out] == true
+  out_client = create_client_from_config()
+  p out_client
+  system('pause')
+end
 
+file_tables = []
+file_columns = []
+file_entries = []
+prod_raw = []
+item_counter = 1
 file_list.each do |file|
-  file_tables = []
-  file_columns = []
-  file_entries = []
 
   cur_file = file[:file_name] + "." + file[:file_extension]
   file_lines = file[:file].count
   line_counter = 1
   file[:file].rewind
 
+
   file[:file].each do |json_data|
     print "Parsing entry: #{line_counter}/#{file_lines} [#{cur_file}]\r"
-    t_tables, t_columns, t_entries = create_entries_from_json(JSON.parse(json_data), line_counter)
+    t_tables, t_columns, t_entries = create_entries_from_json(JSON.parse(json_data), item_counter)
 
-    #file_tables << "INSERT INTO raw_data (product_id,data) VALUES(1,#{json_data})"
+    prod_raw << "INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{json_data.gsub("'","''")}');\n"
     file_tables << t_tables
     file_columns << t_columns
-    file_entries << t_entries
+    #file_entries << t_entries
+
+    out_name = "i-#{$config_vars[:schema]}sql"
+    f_out = File.new(out_name, 'ab')
+    #puts "Writing body to [#{out_name}]\r"
+    create_insert_queries(t_entries, t_tables) do |l|
+    #create_insert_queries(file_entries, file_tables).each do |l|
+      f_out.write(l + ";\n")
+      #puts l
+    end
+    #f_out.write("\n")
+    #prod_raw.each do |l|
+      f_out.write("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data.gsub("'","''"))}');\n")
+    #end
+    f_out.close
 
     line_counter += 1
+    item_counter += 1
+    # if line_counter > 1600
+    #   break
+    # end
     $stdout.flush
   end
   file[:file].close
-p line_counter
-  puts "File complete: #{cur_file}                     "
 
-  if line_counter > 1
-    f_out = File.new(file[:file_name] + ".txt", 'w')
-      create_table_queries(file_tables, file_columns).each do |l|
-      f_out.write(l + ";\n")
-    end
-    f_out.write("\n")
-    create_insert_queries(file_entries, file_tables).each do |l|
-      f_out.write(l + ";\n")
-    end
-  end
+  puts "File complete: #{cur_file}                         "
 end
+
+out_name = "c-#{$config_vars[:schema]}sql"
+if $config_vars[:do_tables]
+  puts "Writing headers to [#{out_name}]\r"
+  f_out = File.new(out_name, 'ab')
+  f_out.rewind
+  create_table_queries(file_tables, file_columns) do |l|
+  #  create_table_queries(file_tables, file_columns).each do |l|
+    f_out.write(l + ";\n")
+    #puts l
+  end
+  f_out.write("\n")
+end
+# if $config_vars[:do_insert]
+#   puts "Writing body to [#{out_name}]\r"
+#   create_insert_queries(file_entries, file_tables) do |l|
+#   #create_insert_queries(file_entries, file_tables).each do |l|
+#     f_out.write(l + ";\n")
+#     #puts l
+#   end
+#   f_out.write("\n")
+#   prod_raw.each do |l|
+#     f_out.write(l)
+#   end
+# end
