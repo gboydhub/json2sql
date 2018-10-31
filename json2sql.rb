@@ -28,6 +28,7 @@ require_relative("functions.rb")
 require_relative("db_connect.rb")
 
 $config_vars = {
+  file_list: [],
   schema: "",
   text_out: true,
   db_out: false,
@@ -94,6 +95,10 @@ HELPDOC
   when '--table-only'
     $config_vars[:do_tables] = true
     $config_vars[:do_insert] = false
+  else
+    if ARGV[i-1].slice(0,2) != "--" && ARGV[i].slice(0,2) != "--"
+      $config_vars[:file_list] << arg
+    end
   end
 end
 
@@ -130,18 +135,21 @@ if $config_vars[:pre_columns_string] != ""
   end
   $config_vars[:pre_columns] = r_hash
 end
-#p $config_vars
 
-file_name = '*.txt'#ARGV[0] || ""
-if file_name.length == 0
+if  $config_vars[:file_list].length == 0
   puts "Please enter a valid file name"
   puts "See json2sql --help"
   exit
 end
 
-file_list = wildcard_fopen(file_name)
-if file_list.length == 0
-  puts "Invalid file name: #{file_name}"
+file_list = []
+$config_vars[:file_list].each do |fname|
+  file_list << wildcard_fopen(fname)
+end
+file_list = file_list.flatten
+
+if file_list.length < $config_vars[:file_list].length
+  puts "Invalid file name as argument"
   puts "See json2sql --help"
   exit
 end
@@ -157,13 +165,6 @@ puts <<~HEREDOC
 
 HEREDOC
 
-out_client = false
-if $config_vars[:db_out] == true
-  out_client = create_client_from_config()
-  p out_client
-  system('pause')
-end
-
 file_tables = []
 file_columns = []
 file_entries = []
@@ -176,53 +177,51 @@ file_list.each do |file|
   file[:file].rewind
   file[:file].each do |json_data|
     print "Parsing entry: #{line_counter}/#{file_lines} [#{cur_file}]\r"
+ 
     t_tables, t_columns, t_entries = create_entries_from_json(JSON.parse(json_data), item_counter)
 
     file_tables << t_tables
     file_columns << t_columns
-    p file_tables
-    p file_columns
-    system('pause')
+
     file_tables = file_tables.flatten.uniq
     file_columns = file_columns.flatten
-    p file_tables
-    p file_columns
-    system('pause')
 
     file_columns.each_index do |i|
       big = file_columns.select { |c| c[:table] == file_columns[i][:table] && c[:name] == file_columns[i][:name]}.max_by { |b| b[:size] }
       file_columns[i][:size] = big[:size]
     end
-    file_columns = file_columns.uniq { |c| c[:name] && c[:table]}
+    file_columns = file_columns.uniq { |c| c.values_at(:name, :table)}
 
-    p file_tables
-    p file_columns
-    system('pause')
-    out_name = "./inserts/i-#{item_counter}-#{$config_vars[:schema]}sql"
-    f_out = File.new(out_name, 'ab')
-    create_insert_queries(t_entries, t_tables) do |l|
-      f_out.write(l + ";\n")
+    if $config_vars[:do_insert] = true
+      out_name = "./inserts/i-#{item_counter}-#{$config_vars[:schema]}sql"
+      f_out = File.new(out_name, 'ab')
+      create_insert_queries(t_entries, t_tables) do |l|
+        f_out.write(l + ";\n")
+      end
+      f_out.write("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}');\n")
+      f_out.close
     end
-    f_out.write("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}');\n")
-    f_out.close
-    t_entries = []
 
     line_counter += 1
     item_counter += 1
     $stdout.flush
+
+    t_tables, t_columns, t_entries = nil
   end
   file[:file].close
 
   puts "File complete: #{cur_file}                         "
 end
 
-out_name = "c-#{$config_vars[:schema]}sql"
-if $config_vars[:do_tables]
-  puts "Writing headers to [#{out_name}]\r"
-  f_out = File.new(out_name, 'ab')
-  f_out.rewind
-  create_table_queries(file_tables, file_columns) do |l|
-    f_out.write(l + ";\n")
+if $config_vars[:do_tables] == true
+  out_name = "c-#{$config_vars[:schema]}sql"
+  if $config_vars[:do_tables]
+    puts "Writing headers to [#{out_name}]\r"
+    f_out = File.new(out_name, 'ab')
+    f_out.rewind
+    create_table_queries(file_tables, file_columns) do |l|
+      f_out.write(l + ";\n")
+    end
+    f_out.write("\n")
   end
-  f_out.write("\n")
 end

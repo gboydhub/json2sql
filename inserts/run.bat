@@ -1,1 +1,0 @@
-for %%G in (*.sql) do @(sqlcmd -S localhost,1433 -E -x -d master -i "%%G") >> log.txt

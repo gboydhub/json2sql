@@ -25,6 +25,7 @@
 # along with this program. (See /COPYING)  If not, see <https://www.gnu.org/licenses/>.
 
 require 'json'
+require 'pry'
 
 def wildcard_fopen(file_string)
   return_files = []
@@ -118,11 +119,17 @@ def create_table_queries(table_list, column_list)
     # c_list.each_index do |i|
     #   p values.select { |h| h[:column_name] == c_list[i][:name] && h[:table_name] == c_list[i][:table]}.max_by { |m| m[:column_size]}
     # end
+      p column_list
+      system('pause')
     cols = column_list.select { |c| c[:table] == table}.uniq { |u| u[:name] }
+    p cols
+    system('pause')
     cols.each_index do |i|
       big = column_list.select { |c| c[:table] == table && c[:name] == cols[i][:name]}.max_by { |b| b[:size] }
       cols[i][:size] = big[:size]
     end
+    p cols
+    system('pause')
     #cols = cols.uniq { |h| h[:name] }#.max_by { |c| c[:size] }#.first#uniq { |h| h[:name] }
     cols.each do |c|
       if c[:size] > 7500
