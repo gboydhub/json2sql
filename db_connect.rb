@@ -53,5 +53,5 @@ def create_client_from_config()
 end
 
 def escape_str(str)
-    Mysql2::Client.escape(str)
+    Mysql2::Client.escape(str).gsub("'","''")
 end

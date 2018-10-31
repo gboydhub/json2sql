@@ -51,8 +51,7 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
         if k == ""
           k = "cvalue"
         end
-        k = escape_str(k.gsub("'", ""))
-        k = "c#{k}"
+        k = "c#{escape_str(k)}"
 
         if !created_tables.include?(k) && nest_id == 0
             created_tables << k
@@ -73,7 +72,7 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
       # p created_columns
       # p current_column
       if created_columns.select { |c| c[:name] == current_column && c[:table] == current_table}.length == 0
-        created_columns << {table: current_table.to_s, name: current_column, size: 0}
+        created_columns << {table: current_table, name: current_column, size: 0}
       end
       
       # p "vtable #{current_table}"
@@ -81,7 +80,7 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
       if val.class != String
         val = val.to_s
       end
-      val = escape_str(val.gsub("'", "''"))#escape_str(val)
+      val = escape_str(val)#escape_str(val)
       values << {table_name: current_table.to_s, column_name: current_column, value: val, column_size: val.length, relation_id: rel_id}
       created_columns.select { |c| c[:name] == current_column && c[:table] == current_table.to_s}.each_index do |i|
         created_columns
@@ -90,27 +89,10 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
         if created_columns[index][:name] == current_column && created_columns[index][:table] == current_table.to_s
           if created_columns[index][:size] < (val.length * 1.2).floor
             created_columns[index][:size] = (val.length * 1.2).floor
-            if current_column == "shipping" && current_table.to_s == "prices"
-            #puts "Col: #{current_column}\nS: #{created_columns[index][:size]}"
-            end
           end
         end
       end
-      #p values.last
   end
-
-  # c_list = created_columns.select { |k| k[:table] == current_table}
-
-  # c_list.each_index do |i|
-  #   biggest = values.select { |h| h[:column_name] == c_list[i][:name] && h[:table_name] == c_list[i][:table]}.max_by { |m| m[:column_size]}
-  #   created_columns[i][:size] = biggest[:column_size]
-  # end
-  #created_columns = c_list
-
-  # created_columns.each_index do |i|
-  #   biggest = values.select { |k| k[:column_name] == created_columns[i][:name] && k[:table_name] == created_columns[i][:table]}.max_by { |e| e[:column_size]}
-  #   created_columns[i][:size] = (biggest[:column_size] * 2).floor
-  # end
 
   created_tables = created_tables.flatten.uniq
   return created_tables, created_columns, values

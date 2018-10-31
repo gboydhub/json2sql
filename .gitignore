@@ -3,3 +3,4 @@ Gemfile.lock
 *.txt
 *.sql
 .DS_Store
+inserts/*.sql

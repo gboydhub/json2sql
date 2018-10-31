@@ -167,38 +167,45 @@ end
 file_tables = []
 file_columns = []
 file_entries = []
-prod_raw = []
 item_counter = 1
 file_list.each do |file|
-
   cur_file = file[:file_name] + "." + file[:file_extension]
   file_lines = file[:file].count
   line_counter = 1
+
   file[:file].rewind
-
-
   file[:file].each do |json_data|
     print "Parsing entry: #{line_counter}/#{file_lines} [#{cur_file}]\r"
     t_tables, t_columns, t_entries = create_entries_from_json(JSON.parse(json_data), item_counter)
 
-    prod_raw << "INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{json_data.gsub("'","''")}');\n"
     file_tables << t_tables
     file_columns << t_columns
-    #file_entries << t_entries
+    p file_tables
+    p file_columns
+    system('pause')
+    file_tables = file_tables.flatten.uniq
+    file_columns = file_columns.flatten
+    p file_tables
+    p file_columns
+    system('pause')
 
-    out_name = "i-#{$config_vars[:schema]}sql"
-    f_out = File.new(out_name, 'ab')
-    #puts "Writing body to [#{out_name}]\r"
-    create_insert_queries(t_entries, t_tables) do |l|
-    #create_insert_queries(file_entries, file_tables).each do |l|
-      f_out.write(l + ";\n")
-      #puts l
+    file_columns.each_index do |i|
+      big = file_columns.select { |c| c[:table] == file_columns[i][:table] && c[:name] == file_columns[i][:name]}.max_by { |b| b[:size] }
+      file_columns[i][:size] = big[:size]
     end
-    #f_out.write("\n")
-    #prod_raw.each do |l|
-      f_out.write("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data.gsub("'","''"))}');\n")
-    #end
+    file_columns = file_columns.uniq { |c| c[:name] && c[:table]}
+
+    p file_tables
+    p file_columns
+    system('pause')
+    out_name = "./inserts/i-#{item_counter}-#{$config_vars[:schema]}sql"
+    f_out = File.new(out_name, 'ab')
+    create_insert_queries(t_entries, t_tables) do |l|
+      f_out.write(l + ";\n")
+    end
+    f_out.write("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}');\n")
     f_out.close
+    t_entries = []
 
     line_counter += 1
     item_counter += 1
@@ -215,9 +222,7 @@ if $config_vars[:do_tables]
   f_out = File.new(out_name, 'ab')
   f_out.rewind
   create_table_queries(file_tables, file_columns) do |l|
-  #  create_table_queries(file_tables, file_columns).each do |l|
     f_out.write(l + ";\n")
-    #puts l
   end
   f_out.write("\n")
 end
