@@ -70,9 +70,9 @@ def https_open_link(url)
   return {file_name: first, file_extension: ext, file: data}
 end
 
-def execute_sqlcmd(query, vars)
-  command = "sqlcmd -S#{$vars[:db_host]} -d#{vars[:db_name]} -U'#{vars[:db_user]}' -P'#{vars[:db_pass]}' -x -I -Q \"#{query}\" > /dev/null 2>&1"
-  system(command)
+def create_sqlcmd(query, vars)
+  command = "sqlcmd -S#{vars[:db_host]} -d#{vars[:db_name]} -U'#{vars[:db_user]}' -P'#{vars[:db_pass]}' -x -I -Q \"#{query}\" > /dev/null 2>&1"
+  command
 end
 
 ## Workhorse method. Accept a hash as val and create all of our information

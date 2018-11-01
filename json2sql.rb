@@ -215,14 +215,24 @@ file_list.each do |file|
     end
     file_columns = file_columns.uniq { |c| c.values_at(:name, :table)}
 
-    if $config_vars[:do_insert] = true
-      out_name = "./#{$config_vars[:schema].chomp(".")}-inserts/i-#{item_counter}-#{$config_vars[:schema]}sql"
-      f_out = File.new(out_name, 'ab')
-      create_insert_queries(t_entries, t_tables) do |l|
-        f_out.write(l + ";\n")
+    if $config_vars[:do_insert] == true
+      if $config_vars[:db_out]
+        puts "Sending inserts via sqlcmd."
+        create_insert_queries(t_entries, t_tables) do |l|
+          cmd = create_sqlcmd(l, $config_vars)
+          if !system(cmd)
+            puts "Command error: #{cmd}"
+          end
+        end
+      else
+        out_name = "./#{$config_vars[:schema].chomp(".")}-inserts/i-#{item_counter}-#{$config_vars[:schema]}sql"
+        f_out = File.new(out_name, 'ab')
+        create_insert_queries(t_entries, t_tables) do |l|
+          f_out.write(l + ";\n")
+        end
+        f_out.write("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}');\n")
+        f_out.close
       end
-      f_out.write("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}');\n")
-      f_out.close
     end
 
     line_counter += 1
@@ -243,14 +253,24 @@ file_list.each do |file|
 end
 
 if $config_vars[:do_tables] == true
-  out_name = "c-#{$config_vars[:schema]}sql"
-  if $config_vars[:do_tables]
-    puts "Writing headers to [#{out_name}]\r"
-    f_out = File.new(out_name, 'ab')
-    f_out.rewind
+  if $config_vars[:db_out]
+    puts "Sending data via sqlcmd."
     create_table_queries(file_tables, file_columns) do |l|
-      f_out.write(l + ";\n")
+      cmd = create_sqlcmd(l, $config_vars)
+      if !system(cmd)
+        puts "Command error: #{cmd}"
+      end
     end
-    f_out.write("\n")
+  else
+    out_name = "c-#{$config_vars[:schema]}sql"
+    if $config_vars[:do_tables]
+      puts "Writing headers to [#{out_name}]\r"
+      f_out = File.new(out_name, 'ab')
+      f_out.rewind
+      create_table_queries(file_tables, file_columns) do |l|
+        f_out.write(l + ";\n")
+      end
+      f_out.write("\n")
+    end
   end
 end
