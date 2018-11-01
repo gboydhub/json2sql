@@ -24,8 +24,31 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. (See /COPYING)  If not, see <https://www.gnu.org/licenses/>.
 
+require 'open-uri'
 require 'json'
 require 'pry'
+
+def load_schema_data(schema_name)
+  f = File.open("session-#{schema_name}json", "a+")
+  if f.count > 0
+    f.rewind
+    data = ""
+    f.each_line do |line|
+      data += line
+    end
+
+    f.close
+    return JSON.parse(data, symbolize_names: true)
+  end
+  f.close
+  return {rel_id: 1, table_data: [], column_data: []}
+end
+
+def save_schema_data(schema_name, data)
+  f = File.open("session-#{schema_name}json", "w")
+  f.write(data.to_json)
+  f.close
+end
 
 def wildcard_fopen(file_string)
   return_files = []
@@ -37,6 +60,19 @@ def wildcard_fopen(file_string)
   end
 
   return_files
+end
+
+def https_open_link(url)
+  file_name = url.split("/").last
+  first = file_name.split(".").first
+  ext = file_name.split(".").last
+  data = open(url).read.split("\n")
+  return {file_name: first, file_extension: ext, file: data}
+end
+
+def execute_sqlcmd(query, vars)
+  command = "sqlcmd -S#{$vars[:db_host]} -d#{vars[:db_name]} -U'#{vars[:db_user]}' -P'#{vars[:db_pass]}' -x -I -Q \"#{query}\" > /dev/null 2>&1"
+  system(command)
 end
 
 ## Workhorse method. Accept a hash as val and create all of our information
@@ -57,7 +93,7 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
         if k == ""
           k = "cvalue"
         end
-        k = "c#{escape_str(k)}"
+        k = "c#{escape_str(k)}".gsub("'", "").gsub("\\", "")
 
         if !created_tables.include?(k) && nest_id == 0
             created_tables << k
@@ -123,7 +159,11 @@ def create_table_queries(table_list, column_list)
       if c[:size] > 7500
         create_query += "#{c[:name]} text,"
       else
-        create_query += "#{c[:name]} varchar(#{c[:size]}),"
+        sz = c[:size]
+        if sz < 10
+          sz = 10
+        end
+        create_query += "#{c[:name]} varchar(#{sz}),"
       end
     end
     create_query = create_query.chomp(",") + ")"

@@ -41,7 +41,9 @@ $config_vars = {
   pre_columns: [],
   pre_columns_string: "",
   do_insert: true,
-  do_tables: true
+  do_tables: true,
+  is_https: false,
+  link_url: ""
 }
 
 ARGV.each_with_index do |arg, i|
@@ -55,6 +57,7 @@ Use:
 Options:
   --help                    Displays this message
   --schema [name]           Adds a schema prefix to SQL commands
+  --link [url]              Downloads json from an https connection instead of using local file
 
 Output options:
   --out-text                Outputs the SQL to a text file (input_filename.txt)
@@ -95,6 +98,9 @@ HELPDOC
   when '--table-only'
     $config_vars[:do_tables] = true
     $config_vars[:do_insert] = false
+  when '--link'
+    $config_vars[:is_https] = true
+    $config_vars[:link_url] = ARGV[i+1]
   else
     if ARGV[i-1].slice(0,2) != "--" && ARGV[i].slice(0,2) != "--"
       $config_vars[:file_list] << arg
@@ -108,9 +114,9 @@ if $config_vars[:db_out] == true
     hit_issue = true
     puts "Must provide a host when using db connection"
   end
-  if $config_vars[:db_port] == ""
+  if $config_vars[:db_name] == ""
     hit_issue = true
-    puts "Must provide a port when using db connection"
+    puts "Must provide a database name"
   end
   if $config_vars[:db_user] == ""
     hit_issue = true
@@ -136,23 +142,29 @@ if $config_vars[:pre_columns_string] != ""
   $config_vars[:pre_columns] = r_hash
 end
 
-if  $config_vars[:file_list].length == 0
-  puts "Please enter a valid file name"
-  puts "See json2sql --help"
-  exit
-end
-
 file_list = []
-$config_vars[:file_list].each do |fname|
-  file_list << wildcard_fopen(fname)
-end
-file_list = file_list.flatten
+if !$config_vars[:is_https]
+  if  $config_vars[:file_list].length == 0
+    puts "Please enter a valid file name"
+    puts "See json2sql --help"
+    exit
+  end
 
-if file_list.length < $config_vars[:file_list].length
-  puts "Invalid file name as argument"
-  puts "See json2sql --help"
-  exit
+  $config_vars[:file_list].each do |fname|
+    file_list << wildcard_fopen(fname)
+  end
+  file_list = file_list.flatten
+
+  if file_list.length < $config_vars[:file_list].length
+    puts "Invalid file name as argument"
+    puts "See json2sql --help"
+    exit
+  end
+else
+  file_list << https_open_link($config_vars[:link_url])
 end
+
+saved_state = load_schema_data($config_vars[:schema])
 
 system('cls') || system('clear')
 
@@ -165,16 +177,27 @@ puts <<~HEREDOC
 
 HEREDOC
 
-file_tables = []
-file_columns = []
+begin
+  Dir.mkdir("#{$config_vars[:schema].chomp(".")}-inserts")
+rescue => exception
+  
+end
+
+file_tables = saved_state[:table_data]
+file_columns = saved_state[:column_data]
 file_entries = []
-item_counter = 1
+item_counter = saved_state[:rel_id]
 file_list.each do |file|
   cur_file = file[:file_name] + "." + file[:file_extension]
-  file_lines = file[:file].count
-  line_counter = 1
+  if $config_vars[:is_https]
+    file_lines = file[:file].length
+  else
+    file_lines = file[:file].count
+    file[:file].rewind
+  end
 
-  file[:file].rewind
+
+  line_counter = 1
   file[:file].each do |json_data|
     print "Parsing entry: #{line_counter}/#{file_lines} [#{cur_file}]\r"
  
@@ -193,7 +216,7 @@ file_list.each do |file|
     file_columns = file_columns.uniq { |c| c.values_at(:name, :table)}
 
     if $config_vars[:do_insert] = true
-      out_name = "./inserts/i-#{item_counter}-#{$config_vars[:schema]}sql"
+      out_name = "./#{$config_vars[:schema].chomp(".")}-inserts/i-#{item_counter}-#{$config_vars[:schema]}sql"
       f_out = File.new(out_name, 'ab')
       create_insert_queries(t_entries, t_tables) do |l|
         f_out.write(l + ";\n")
@@ -208,9 +231,15 @@ file_list.each do |file|
 
     t_tables, t_columns, t_entries = nil
   end
-  file[:file].close
+  if !$config_vars[:is_https]
+    file[:file].close
+  end
 
   puts "File complete: #{cur_file}                         "
+  saved_state[:rel_id] = item_counter
+  saved_state[:table_data] = file_tables
+  saved_state[:column_data] = file_columns
+  save_schema_data($config_vars[:schema], saved_state)
 end
 
 if $config_vars[:do_tables] == true
