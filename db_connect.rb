@@ -24,33 +24,33 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. (See /COPYING)  If not, see <https://www.gnu.org/licenses/>.
 
-require 'tiny_tds'
+#require 'tiny_tds'
 require 'mysql2'
 
-def create_client_from_config()
-    unless $config_vars[:db_out]
-        return nil
-    end
+# def create_client_from_config()
+#     unless $config_vars[:db_out]
+#         return nil
+#     end
 
-    case $config_vars[:db_type].downcase
-    when 'azure'
-        client = TinyTds::Client.new username: $config_vars[:db_user], password: $config_vars[:db_pass],
-                host: $config_vars[:db_host], port: $config_vars[:db_port].to_i, database: $config_vars[:db_name], azure: true
-        unless client.active?
-            return nil
-        end
+#     case $config_vars[:db_type].downcase
+#     when 'azure'
+#         client = TinyTds::Client.new username: $config_vars[:db_user], password: $config_vars[:db_pass],
+#                 host: $config_vars[:db_host], port: $config_vars[:db_port].to_i, database: $config_vars[:db_name], azure: true
+#         unless client.active?
+#             return nil
+#         end
 
-        results = client.execute("SET ANSI_NULLS ON")  
-        results = client.execute("SET CURSOR_CLOSE_ON_COMMIT OFF")  
-        results = client.execute("SET ANSI_NULL_DFLT_ON ON")  
-        results = client.execute("SET IMPLICIT_TRANSACTIONS OFF")  
-        results = client.execute("SET ANSI_PADDING ON")  
-        results = client.execute("SET QUOTED_IDENTIFIER ON")  
-        results = client.execute("SET ANSI_WARNINGS ON")  
-        results = client.execute("SET CONCAT_NULL_YIELDS_NULL ON")  
-        return client
-    end
-end
+#         results = client.execute("SET ANSI_NULLS ON")  
+#         results = client.execute("SET CURSOR_CLOSE_ON_COMMIT OFF")  
+#         results = client.execute("SET ANSI_NULL_DFLT_ON ON")  
+#         results = client.execute("SET IMPLICIT_TRANSACTIONS OFF")  
+#         results = client.execute("SET ANSI_PADDING ON")  
+#         results = client.execute("SET QUOTED_IDENTIFIER ON")  
+#         results = client.execute("SET ANSI_WARNINGS ON")  
+#         results = client.execute("SET CONCAT_NULL_YIELDS_NULL ON")  
+#         return client
+#     end
+# end
 
 def escape_str(str)
     Mysql2::Client.escape(str).gsub("'","''")

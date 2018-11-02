@@ -74,7 +74,6 @@ def create_sqlcmd(query, vars)
   command = "sqlcmd -S#{vars[:db_host]} -d#{vars[:db_name]} -U'#{vars[:db_user]}' -P'#{vars[:db_pass]}' -x -I -Q \"#{query}\" > /dev/null 2>&1"
   command
 end
-
 ## Workhorse method. Accept a hash as val and create all of our information
 ## Recursively generates:
 ##    [Array of Strings]  created_tables - List of all tables
