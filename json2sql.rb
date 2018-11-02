@@ -165,6 +165,7 @@ else
 end
 
 saved_state = load_schema_data($config_vars[:schema])
+original_state = load_schema_data($config_vars[:schema])
 
 system('cls') || system('clear')
 
@@ -178,9 +179,9 @@ puts <<~HEREDOC
 HEREDOC
 
 begin
-  Dir.mkdir("#{$config_vars[:schema].chomp(".")}-inserts")
+  Dir.mkdir("#{$config_vars[:schema].chomp(".")}-inserts") #Try and make directory
 rescue => exception
-  
+  #Continue if it already exists
 end
 
 file_tables = saved_state[:table_data]
@@ -249,6 +250,7 @@ file_list.each do |file|
   saved_state[:rel_id] = item_counter
   saved_state[:table_data] = file_tables
   saved_state[:column_data] = file_columns
+  binding.pry
   save_schema_data($config_vars[:schema], saved_state)
 end
 
