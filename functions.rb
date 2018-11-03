@@ -85,6 +85,19 @@ def create_sqlcmd(query, vars)
   command = "sqlcmd -S#{vars[:db_host]} -d#{vars[:db_name]} -U'#{vars[:db_user]}' -P'#{vars[:db_pass]}' -x -I -Q \"#{query}\" > /dev/null 2>&1"
   command
 end
+
+def get_column_type(column)
+  if column[:size] < 5
+    column[:size] = 5
+  end
+
+  type = "nvarchar(#{column[:size]})"
+  if column[:size] > 3500
+    type = "text"
+  end
+  type
+end
+
 ## Workhorse method. Accept a hash as val and create all of our information
 ## Recursively generates:
 ##    [Array of Strings]  created_tables - List of all tables
@@ -103,7 +116,7 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
         if k == ""
           k = "cvalue"
         end
-        k = "c#{escape_str(k)}".gsub("'", "").gsub("\\", "")
+        k = "c#{escape_str(k)}".gsub(/[^0-9A-Za-z]/, '')
 
         if !created_tables.include?(k) && nest_id == 0
             created_tables << k
@@ -169,7 +182,21 @@ def alter_table_queries(old_state, new_state)
 
   columns_to_create.flatten!
   columns_to_alter = changed_columns - columns_to_create
-  binding.pry
+
+  create_table_queries(tables_to_create, columns_to_create) do |query|
+    yield query
+  end
+
+  columns_to_create = columns_to_create.select { |c| tables_to_create.include?(c[:table]) == false }
+  columns_to_create.each do |col|
+    query = "ALTER TABLE #{$config_vars[:schema]}#{col[:table]} ADD #{col[:name]} #{get_column_type(col)}"
+    yield query
+  end
+
+  columns_to_alter.each do |col|
+    query = "ALTER TABLE #{$config_vars[:schema]}#{col[:table]} ALTER COLUMN #{col[:name]} #{get_column_type(col)}"
+    yield query
+  end
 end
 
 ## Create table SQL queries and yield them out to a block
@@ -177,28 +204,28 @@ def create_table_queries(table_list, column_list)
   create_statements = []
   column_list = column_list.flatten
   table_list = table_list.flatten.uniq
+
+  # Create extra table for raw data(original json line) if we added new tables
+  if table_list.length > 0
+    yield "CREATE TABLE #{$config_vars[:schema]}raw_data (product_id bigint IDENTITY(1,1) PRIMARY KEY, data text)"
+  end
+
   table_list.each do |table|
     col_count = 0
     table_cols = []
 
-    create_query = "CREATE TABLE #{$config_vars[:schema]}#{table} (id bigint IDENTITY(1,1) PRIMARY KEY,product_id bigint,"
+    create_query = "CREATE TABLE #{$config_vars[:schema]}#{table} (id bigint IDENTITY(1,1) PRIMARY KEY,product_id bigint FOREIGN KEY REFERENCES #{$config_vars[:schema]}raw_data(product_id),"
 
+    # Grab every new column for this table
     cols = column_list.select { |c| c[:table] == table}.uniq { |u| u[:name] }
     cols.each_index do |i|
       big = column_list.select { |c| c[:table] == table && c[:name] == cols[i][:name]}.max_by { |b| b[:size] }
       cols[i][:size] = big[:size]
     end
 
+    # Add new columns to query
     cols.each do |c|
-      if c[:size] > 7500
-        create_query += "#{c[:name]} text,"
-      else
-        sz = c[:size]
-        if sz < 10
-          sz = 10
-        end
-        create_query += "#{c[:name]} varchar(#{sz}),"
-      end
+      create_query += "#{c[:name]} #{get_column_type(c)},"
     end
     create_query = create_query.chomp(",") + ")"
 
@@ -206,8 +233,6 @@ def create_table_queries(table_list, column_list)
     yield create_query
   end
 
-  # Create extra table for raw data, original json line
-  yield "CREATE TABLE #{$config_vars[:schema]}raw_data (id bigint IDENTITY(1,1) PRIMARY KEY, product_id bigint, data text)"
 end
 
 ## Create insert queries and yield them to block
@@ -218,7 +243,6 @@ def create_insert_queries(entries, tables)
   last_table = tables[0]
   tables = tables.flatten.uniq
   entries = entries.flatten
-
 
   insert_queries = []
   tables.each do |table|

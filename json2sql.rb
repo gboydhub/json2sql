@@ -197,7 +197,7 @@ file_list.each do |file|
     file[:file].rewind
   end
 
-
+  needs_insert_raw_data = true
   line_counter = 1
   file[:file].each do |json_data|
     print "Parsing entry: #{line_counter}/#{file_lines} [#{cur_file}]\r"
@@ -214,6 +214,11 @@ file_list.each do |file|
     if $config_vars[:do_insert] == true
       if $config_vars[:db_out]
         puts "Sending inserts via sqlcmd."
+        if needs_insert_raw_data
+          system(create_sqlcmd("SET IDENTITY_INSERT #{$config_vars[:schema]}raw_data ON"))
+          system(create_sqlcmd("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}')"))
+          needs_insert_raw_data = false
+        end
         create_insert_queries(t_entries, t_tables) do |l|
           cmd = create_sqlcmd(l, $config_vars)
           if !system(cmd)
@@ -223,16 +228,20 @@ file_list.each do |file|
       else
         out_name = "./#{$config_vars[:schema].chomp(".")}-inserts/i-#{item_counter}-#{$config_vars[:schema]}sql"
         f_out = File.new(out_name, 'ab')
+        if needs_insert_raw_data
+          f_out.write("SET IDENTITY_INSERT #{$config_vars[:schema]}raw_data ON;\n")
+          f_out.write("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}');\n")
+          needs_insert_raw_data = false
+        end
         create_insert_queries(t_entries, t_tables) do |l|
           f_out.write(l + ";\n")
         end
-        f_out.write("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}');\n")
         f_out.close
       end
+      item_counter += 1
     end
 
     line_counter += 1
-    item_counter += 1
     $stdout.flush
 
     t_tables, t_columns, t_entries = nil
