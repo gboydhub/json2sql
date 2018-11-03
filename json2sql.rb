@@ -208,13 +208,8 @@ file_list.each do |file|
     file_columns << t_columns
 
     file_tables = file_tables.flatten.uniq
-    file_columns = file_columns.flatten
 
-    file_columns.each_index do |i|
-      big = file_columns.select { |c| c[:table] == file_columns[i][:table] && c[:name] == file_columns[i][:name]}.max_by { |b| b[:size] }
-      file_columns[i][:size] = big[:size]
-    end
-    file_columns = file_columns.uniq { |c| c.values_at(:name, :table)}
+    file_columns = sort_column_list(file_columns)
 
     if $config_vars[:do_insert] == true
       if $config_vars[:db_out]
@@ -250,7 +245,7 @@ file_list.each do |file|
   saved_state[:rel_id] = item_counter
   saved_state[:table_data] = file_tables
   saved_state[:column_data] = file_columns
-  binding.pry
+
   save_schema_data($config_vars[:schema], saved_state)
 end
 
@@ -279,7 +274,7 @@ if $config_vars[:do_tables] == true
   else
     if $config_vars[:db_out]
       puts "Sending data via sqlcmd."
-      altar_table_queries(original_state, saved_state) do |l|
+      alter_table_queries(original_state, saved_state) do |l|
         cmd = create_sqlcmd(l, $config_vars)
         if !system(cmd)
           puts "Command error: #{cmd}"
@@ -291,7 +286,7 @@ if $config_vars[:do_tables] == true
         puts "Writing headers to [#{out_name}]\r"
         f_out = File.new(out_name, 'ab')
         f_out.rewind
-        altar_table_queries(original_state, saved_state) do |l|
+        alter_table_queries(original_state, saved_state) do |l|
           f_out.write(l + ";\n")
         end
         f_out.write("\n")

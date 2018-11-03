@@ -28,6 +28,17 @@ require 'open-uri'
 require 'json'
 require 'pry'
 
+def sort_column_list(column_list)
+  list = column_list.map(&:clone).flatten
+
+  list.each_index do |i|
+    big = list.select { |c| c[:table] == list[i][:table] && c[:name] == list[i][:name]}.max_by { |b| b[:size] }
+    list[i][:size] = big[:size]
+  end
+
+  list.uniq { |c| c.values_at(:name, :table)}
+end
+
 def load_schema_data(schema_name)
   f = File.open("session-#{schema_name}json", "a+")
   if f.count > 0
@@ -82,7 +93,7 @@ end
 def create_entries_from_json(val, rel_id=1, current_table="", current_column="", nest_id=0, created_tables=[], created_columns=[], values=[])
   if val.class == Array
       val.each do |v|
-        created_tables, created_columns, values = create_entries_from_json(v, rel_id, current_table, current_column, nest_id, created_tables, created_columns, values)
+        created_tables, created_columns, values = create_entries_from_json(v, rel_id, current_table, current_column, nest_id + 1, created_tables, created_columns, values)
       end
   elsif val.class == Hash
       val.each_pair do |k, v|
@@ -121,9 +132,9 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
       end
       val = escape_str(val)
       values << {table_name: current_table.to_s, column_name: current_column, value: val, column_size: val.length, relation_id: rel_id}
-      created_columns.select { |c| c[:name] == current_column && c[:table] == current_table.to_s}.each_index do |i|
-        created_columns
-      end
+      # created_columns.select { |c| c[:name] == current_column && c[:table] == current_table.to_s}.each_index do |i|
+      #   created_columns
+      # end
       created_columns.each_index do |index|
         if created_columns[index][:name] == current_column && created_columns[index][:table] == current_table.to_s
           if created_columns[index][:size] < (val.length * 1.2).floor
@@ -138,8 +149,21 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
 end
 
 ## Altar and create new tables if needed on multi-session job
-def altar_table_queries(old_state, new_state)
-  
+def alter_table_queries(old_state, new_state)
+  old_tables = old_state[:table_data].clone.flatten
+  new_tables = new_state[:table_data].clone.flatten
+  tables_to_create = (old_tables + new_tables).flatten.uniq
+
+  old_columns = old_state[:column_data].clone.flatten
+  new_columns = new_state[:column_data].clone.flatten
+
+  merged_columns = sort_column_list(old_columns + new_columns)
+  changed_columns = merged_columns - old_columns
+
+  changed_columns.each do |col|
+    
+  end
+  binding.pry
 end
 
 ## Create table SQL queries and yield them out to a block
