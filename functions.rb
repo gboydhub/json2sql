@@ -41,7 +41,7 @@ def load_schema_data(schema_name)
     return JSON.parse(data, symbolize_names: true)
   end
   f.close
-  return {rel_id: 1, table_data: [], column_data: []}
+  return {rel_id: 1, multi_session: 0, table_data: [], column_data: []}
 end
 
 def save_schema_data(schema_name, data)
@@ -135,6 +135,11 @@ def create_entries_from_json(val, rel_id=1, current_table="", current_column="",
 
   created_tables = created_tables.flatten.uniq
   return created_tables, created_columns, values
+end
+
+## Altar and create new tables if needed on multi-session job
+def altar_table_queries(old_state, new_state)
+  
 end
 
 ## Create table SQL queries and yield them out to a block

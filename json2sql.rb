@@ -255,24 +255,50 @@ file_list.each do |file|
 end
 
 if $config_vars[:do_tables] == true
-  if $config_vars[:db_out]
-    puts "Sending data via sqlcmd."
-    create_table_queries(file_tables, file_columns) do |l|
-      cmd = create_sqlcmd(l, $config_vars)
-      if !system(cmd)
-        puts "Command error: #{cmd}"
+  if saved_state[:multi_session] == 0
+    if $config_vars[:db_out]
+      puts "Sending data via sqlcmd."
+      create_table_queries(file_tables, file_columns) do |l|
+        cmd = create_sqlcmd(l, $config_vars)
+        if !system(cmd)
+          puts "Command error: #{cmd}"
+        end
+      end
+    else
+      out_name = "ct-#{$config_vars[:schema]}sql"
+      if $config_vars[:do_tables]
+        puts "Writing headers to [#{out_name}]\r"
+        f_out = File.new(out_name, 'ab')
+        f_out.rewind
+        create_table_queries(file_tables, file_columns) do |l|
+          f_out.write(l + ";\n")
+        end
+        f_out.write("\n")
       end
     end
   else
-    out_name = "c-#{$config_vars[:schema]}sql"
-    if $config_vars[:do_tables]
-      puts "Writing headers to [#{out_name}]\r"
-      f_out = File.new(out_name, 'ab')
-      f_out.rewind
-      create_table_queries(file_tables, file_columns) do |l|
-        f_out.write(l + ";\n")
+    if $config_vars[:db_out]
+      puts "Sending data via sqlcmd."
+      altar_table_queries(original_state, saved_state) do |l|
+        cmd = create_sqlcmd(l, $config_vars)
+        if !system(cmd)
+          puts "Command error: #{cmd}"
+        end
       end
-      f_out.write("\n")
+    else
+      out_name = "at-#{$config_vars[:schema]}sql"
+      if $config_vars[:do_tables]
+        puts "Writing headers to [#{out_name}]\r"
+        f_out = File.new(out_name, 'ab')
+        f_out.rewind
+        altar_table_queries(original_state, saved_state) do |l|
+          f_out.write(l + ";\n")
+        end
+        f_out.write("\n")
+      end
     end
   end
+
+  saved_state[:multi_session] = 1
+  save_schema_data($config_vars[:schema], saved_state)
 end
