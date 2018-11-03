@@ -152,7 +152,7 @@ end
 def alter_table_queries(old_state, new_state)
   old_tables = old_state[:table_data].clone.flatten
   new_tables = new_state[:table_data].clone.flatten
-  tables_to_create = (old_tables + new_tables).flatten.uniq
+  tables_to_create = (new_tables - old_tables).flatten.uniq
 
   old_columns = old_state[:column_data].clone.flatten
   new_columns = new_state[:column_data].clone.flatten
@@ -160,9 +160,15 @@ def alter_table_queries(old_state, new_state)
   merged_columns = sort_column_list(old_columns + new_columns)
   changed_columns = merged_columns - old_columns
 
+  columns_to_create = []
   changed_columns.each do |col|
-    
+    if old_columns.select{ |o| o[:table] == col[:table] && o[:name] == col[:name]}.length == 0
+      columns_to_create << col
+    end
   end
+
+  columns_to_create.flatten!
+  columns_to_alter = changed_columns - columns_to_create
   binding.pry
 end
 
