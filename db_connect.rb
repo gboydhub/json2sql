@@ -50,7 +50,6 @@ require 'mysql2'
 #         results = client.execute("SET CONCAT_NULL_YIELDS_NULL ON")  
 #         return client
 #     end
-# end
 
 def escape_str(str)
     Mysql2::Client.escape(str).gsub("'","''")

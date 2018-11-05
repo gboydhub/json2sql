@@ -215,8 +215,8 @@ file_list.each do |file|
       if $config_vars[:db_out]
         puts "Sending inserts via sqlcmd."
         if needs_insert_raw_data
-          system(create_sqlcmd("SET IDENTITY_INSERT #{$config_vars[:schema]}raw_data ON"))
-          system(create_sqlcmd("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}')"))
+          #system(create_sqlcmd("SET IDENTITY_INSERT #{$config_vars[:schema]}raw_data ON", $config_vars))
+          system(create_sqlcmd("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}')", $config_vars))
           needs_insert_raw_data = false
         end
         create_insert_queries(t_entries, t_tables) do |l|
@@ -229,7 +229,7 @@ file_list.each do |file|
         out_name = "./#{$config_vars[:schema].chomp(".")}-inserts/i-#{item_counter}-#{$config_vars[:schema]}sql"
         f_out = File.new(out_name, 'ab')
         if needs_insert_raw_data
-          f_out.write("SET IDENTITY_INSERT #{$config_vars[:schema]}raw_data ON;\n")
+          #f_out.write("SET IDENTITY_INSERT #{$config_vars[:schema]}raw_data ON;\n")
           f_out.write("INSERT INTO #{$config_vars[:schema]}raw_data (product_id,data) VALUES(#{item_counter},'#{escape_str(json_data)}');\n")
           needs_insert_raw_data = false
         end

@@ -26,7 +26,7 @@
 
 require 'open-uri'
 require 'json'
-require 'pry'
+#require 'pry'
 
 def sort_column_list(column_list)
   list = column_list.map(&:clone).flatten
@@ -82,7 +82,7 @@ def https_open_link(url)
 end
 
 def create_sqlcmd(query, vars)
-  command = "sqlcmd -S#{vars[:db_host]} -d#{vars[:db_name]} -U'#{vars[:db_user]}' -P'#{vars[:db_pass]}' -x -I -Q \"#{query}\" > /dev/null 2>&1"
+  command = "sqlcmd -S#{vars[:db_host]} -d#{vars[:db_name]} -U'#{vars[:db_user]}' -P'#{vars[:db_pass]}' -x -I -Q \"#{query}\""
   command
 end
 
@@ -207,14 +207,15 @@ def create_table_queries(table_list, column_list)
 
   # Create extra table for raw data(original json line) if we added new tables
   if table_list.length > 0
-    yield "CREATE TABLE #{$config_vars[:schema]}raw_data (product_id bigint IDENTITY(1,1) PRIMARY KEY, data text)"
+    yield "CREATE TABLE #{$config_vars[:schema]}raw_data (id bigint IDENTITY(1,1) PRIMARY KEY, product_id bigint, data text)"
   end
 
   table_list.each do |table|
     col_count = 0
     table_cols = []
 
-    create_query = "CREATE TABLE #{$config_vars[:schema]}#{table} (id bigint IDENTITY(1,1) PRIMARY KEY,product_id bigint FOREIGN KEY REFERENCES #{$config_vars[:schema]}raw_data(product_id),"
+    #create_query = "CREATE TABLE #{$config_vars[:schema]}#{table} (id bigint IDENTITY(1,1) PRIMARY KEY,product_id bigint FOREIGN KEY REFERENCES #{$config_vars[:schema]}raw_data(product_id),"
+    create_query = "CREATE TABLE #{$config_vars[:schema]}#{table} (id bigint IDENTITY(1,1) PRIMARY KEY,product_id bigint,"
 
     # Grab every new column for this table
     cols = column_list.select { |c| c[:table] == table}.uniq { |u| u[:name] }
